@@ -125,9 +125,12 @@ class StreamHandler:
                     panel.add_system_message(f"错误: {event}")
                     break
 
-                # token 事件：确保渲染前 AssistantMessage 已创建（防首 token 丢失）
+                # token / error 事件：确保渲染前 AssistantMessage 已创建
                 if event.type == "token" and assistant_msg is None:
                     assistant_msg = panel.start_assistant_message()
+                elif event.type == "error" and assistant_msg is None:
+                    assistant_msg = panel.start_assistant_message()
+                    panel.append_token(event.content)
 
                 # 委托 RendererRegistry 处理渲染
                 RendererRegistry.render(panel, event)
@@ -176,6 +179,9 @@ class StreamHandler:
                             "content": str(event.result) if event.result else "",
                             "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
                         })
+
+                    case "error":
+                        _final_content += event.content
 
                     case "file_change":
                         # 缓冲文件变更事件，等 done 时渲染为永久 artifact
