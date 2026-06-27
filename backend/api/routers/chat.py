@@ -65,7 +65,7 @@ async def _to_async(sync_gen):
 @router.post("/chat/stream")
 async def chat_stream(body: ChatRequest, state: AppState = Depends(get_app_state)):
     """发送消息并返回 SSE 流式响应"""
-    stream_gen, saved_id = run_agent_session(state, body.message, body.conversation_id)
+    stream_gen, saved_id = run_agent_session(state, body.message, body.conversation_id, reasoning_effort=body.reasoning_effort)
 
     async def _generate():
         yield {

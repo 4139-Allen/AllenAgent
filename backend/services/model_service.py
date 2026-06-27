@@ -16,7 +16,7 @@ def list_models(model_manager):
                 "name": m.name,
                 "model": m.model,
                 "protocol": m.protocol,
-                "is_current": m.name == model_manager.current_model,
+                "is_current": m.model == model_manager.current_model,
             }
             for m in model_manager.config.available_models
         ],

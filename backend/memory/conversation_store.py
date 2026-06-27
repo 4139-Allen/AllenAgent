@@ -68,12 +68,20 @@ class ConversationStore:
 
         # 构建 JSONL 行
         lines = []
-        # 第一行：元数据（不含系统提示词，运行时动态注入）
+        # 第一行：元数据（保留已有 pin 状态）
+        old_pinned = False
+        if filepath.exists():
+            try:
+                old_meta = json.loads(filepath.read_text(encoding="utf-8").splitlines()[0])
+                old_pinned = old_meta.get("pinned", False)
+            except Exception:
+                pass
         meta = {
             "type": "meta",
             "id": conversation_id,
             "title": title,
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "pinned": old_pinned,
         }
         lines.append(json.dumps(meta, ensure_ascii=False))
 
@@ -323,9 +331,13 @@ class ConversationStore:
                         "created_at": meta.get("created_at", ""),
                         "turn_count": self._count_turns(filepath),
                         "file_size": size,
+                        "pinned": meta.get("pinned", False),
                     })
             except (json.JSONDecodeError, IndexError, KeyError):
                 continue
+        # 置顶排最前，按创建时间倒序（最新的在最上面）
+        conversations.sort(key=lambda c: c.get("created_at", "") or "", reverse=True)
+        conversations.sort(key=lambda c: not c.get("pinned", False))
         return conversations
 
     def delete(self, conversation_id: str) -> bool:
@@ -335,6 +347,23 @@ class ConversationStore:
             filepath.unlink()
             return True
         return False
+
+    def toggle_pin(self, conversation_id: str) -> bool:
+        """切换置顶状态，返回新的 pin 状态"""
+        filepath = CONVERSATIONS_DIR / f"{conversation_id}.jsonl"
+        if not filepath.exists():
+            raise FileNotFoundError(f"对话 '{conversation_id}' 不存在")
+
+        lines = filepath.read_text(encoding="utf-8").splitlines()
+        if not lines:
+            raise ValueError("对话文件为空")
+
+        meta = json.loads(lines[0])
+        current = meta.get("pinned", False)
+        meta["pinned"] = not current
+        lines[0] = json.dumps(meta, ensure_ascii=False)
+        filepath.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return not current
 
     def _count_turns(self, filepath: Path) -> int:
         """统计对话轮数"""
@@ -380,7 +409,11 @@ class ConversationStore:
                 }
             else:
                 content = msg.get("content", "")
-                return {"type": "assistant", "content": content, "ts": ts}
+                line = {"type": "assistant", "content": content, "ts": ts}
+                thinking = msg.get("_thinking", "")
+                if thinking.strip():
+                    line["thinking"] = thinking
+                return line
         elif role == "tool":
             line = {
                 "type": "tool_result",
@@ -414,6 +447,9 @@ class ConversationStore:
             msg = {"role": "user", "content": obj.get("content", "")}
         elif msg_type == "assistant":
             msg = {"role": "assistant", "content": obj.get("content", "")}
+            thinking = obj.get("thinking", "")
+            if thinking:
+                msg["_thinking"] = thinking
         elif msg_type == "tool_call":
             msg = {
                 "role": "assistant",

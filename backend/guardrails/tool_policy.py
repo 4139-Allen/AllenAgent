@@ -61,11 +61,13 @@ class ToolPolicy:
             action = kwargs.get("action", "read")
             if action in ("read", "list"):
                 return ToolPolicyResult(allowed=True, reason="")
-            # 写入/删除：最低确认
+            # 写入/删除：根据风险级别决定
             risk = self._check_file_risk(kwargs)
             if risk["level"] == "block":
                 return ToolPolicyResult(allowed=False, reason=risk["reason"])
-            # 所有非读操作都需要确认
+            if risk["level"] == "safe":
+                return ToolPolicyResult(allowed=True, reason="")
+            # 需要确认
             reason = risk["reason"] or f"{action}: {kwargs.get('filepath', '')}"
             return ToolPolicyResult(allowed=True, reason=reason, needs_confirm=True)
 
@@ -148,6 +150,9 @@ class ToolPolicy:
 
         try:
             if target.is_relative_to(project_root):
+                # Allen.md 免确认
+                if target.name == "Allen.md" or "Allen.md" in str(target):
+                    return {"level": "safe", "reason": ""}
                 # 项目内：覆盖已有文件需确认
                 if target.exists() and target.is_file():
                     return {"level": "confirm", "reason": f"覆盖已有文件: {filepath}"}

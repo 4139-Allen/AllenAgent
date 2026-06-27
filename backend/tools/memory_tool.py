@@ -23,6 +23,7 @@ class UpdateMemoryTool(BaseTool):
     def set_memory(self, allen_memory):
         """延迟绑定"""
         self.allen_memory = allen_memory
+        return self
 
     def execute(self, section: str, content: str, **kwargs) -> ToolResult:
         """

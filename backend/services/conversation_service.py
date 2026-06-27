@@ -20,6 +20,7 @@ def list_conversations(store: ConversationStore, page: int = 1, page_size: int =
                 "id": c["id"],
                 "title": c.get("title", ""),
                 "turn_count": c.get("turn_count", 0),
+                "pinned": c.get("pinned", False),
             }
             for c in items
         ],
@@ -41,7 +42,6 @@ def get_conversation(store: ConversationStore, conv_id: str):
     loaded = store.load(conv_id)
     return {
         "id": conv_id,
-        "title": loaded.title,
         "turn_count": loaded.turn_count,
         "history": loaded.get_history(),
     }
@@ -50,3 +50,31 @@ def get_conversation(store: ConversationStore, conv_id: str):
 def delete_conversation(store: ConversationStore, conv_id: str) -> bool:
     """删除对话"""
     return store.delete(conv_id)
+
+
+def toggle_pin(store: ConversationStore, conv_id: str) -> dict:
+    """切换置顶状态"""
+    pinned = store.toggle_pin(conv_id)
+    return {"status": "ok", "id": conv_id, "pinned": pinned}
+
+
+def compress_conversation(app_state, conv_id: str) -> dict:
+    """用 LLM 压缩对话历史"""
+    from memory.short_term import ConversationMemory
+
+    store = app_state.store
+    llm = app_state.model_manager.current_provider
+    loaded = store.load(conv_id, context_window=0)
+
+    from agents.compression import ConversationCompressor
+    compressor = ConversationCompressor(llm)
+
+    old_messages = loaded.extract_old_messages(keep_recent=5)
+    if not old_messages:
+        return {"status": "ok", "message": "对话已足够精简，无需压缩"}
+
+    summary = compressor._compress_with_llm(old_messages)
+    loaded.replace_old_with_summary(summary, keep_recent=5)
+    store.save(loaded, conv_id)
+
+    return {"status": "ok", "message": "对话已压缩", "summary": summary}

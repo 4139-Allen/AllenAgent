@@ -10,7 +10,7 @@ from schemas.stream import StreamEvent
 logger = logging.getLogger(__name__)
 
 
-def run_agent_session(app_state, message: str, session_id: str | None):
+def run_agent_session(app_state, message: str, session_id: str | None, reasoning_effort: str | None = None):
     """
     运行 Agent 并自动保存对话。
 
@@ -18,6 +18,7 @@ def run_agent_session(app_state, message: str, session_id: str | None):
         app_state: 全局 AppState
         message: 用户消息
         session_id: 对话 ID（续聊时传入）
+        reasoning_effort: 推理强度（low/medium/high）
 
     Returns:
         (stream_generator, saved_id_container)
@@ -25,6 +26,8 @@ def run_agent_session(app_state, message: str, session_id: str | None):
         - saved_id_container: [saved_id] 列表，流结束后读取
     """
     agent = app_state.create_agent(session_id)
+    if reasoning_effort:
+        agent.reasoning_effort = reasoning_effort
     saved_id = [session_id]
 
     def _stream():
