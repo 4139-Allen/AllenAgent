@@ -22,16 +22,17 @@ build/
 models.yaml
 
 # 对话记录（含隐私）
-conversations/
+backend/conversations/
 
 # Agent 持久记忆（可能含隐私）
-Allen.md
+backend/Allen.md
 
 # 缓存
+backend/__pycache__/
 .pytest_cache/
 
 # 向量数据库
-Vector_library/
+backend/Vector_library/
 
 # 日志
 *.log
