@@ -27,4 +27,4 @@ dependencies = [
 allen = "main:run_tui"
 
 [tool.setuptools]
-py-modules = []
+py-modules = ["main", "config"]

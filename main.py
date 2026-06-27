@@ -10,6 +10,11 @@ from dotenv import load_dotenv
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent
 
+# 添加根目录到 sys.path（确保包内导入可用）
+import sys
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 # 加载环境变量
 load_dotenv()
 
