@@ -121,6 +121,8 @@ def execute_task_stream(
             messages=messages,
             tools=tools_schema if tools_schema else None,
             temperature=0.1,
+            enable_thinking=True,
+            reasoning_effort=getattr(agent, 'reasoning_effort', None) or "medium",
         ):
             if chunk["type"] == "thinking_token":
                 thinking_buffer += chunk["content"]
@@ -654,7 +656,10 @@ def execute_task_stream(
 
         if agent.memory and final_answer:
             try:
-                agent.memory.add_message("assistant", final_answer)
+                kwargs = {}
+                if turn_thinking_content.strip():
+                    kwargs["_thinking"] = turn_thinking_content
+                agent.memory.add_message("assistant", final_answer, **kwargs)
             except Exception:
                 pass
 

@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import ApiConfig
 from api.dependencies import AppState
-from api.routers import chat, conversations, models, memory, health
+from api.routers import chat, conversations, models, memory, health, profile
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ def create_app() -> FastAPI:
     app.include_router(models.router, prefix="/api")
     app.include_router(memory.router, prefix="/api")
     app.include_router(health.router)
+    app.include_router(profile.router)
     return app
 
 

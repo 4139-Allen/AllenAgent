@@ -52,7 +52,8 @@ class AllenMemory:
         self._parse(content)
 
     def _parse(self, content: str):
-        """解析 markdown 为段落字典"""
+        """解析 markdown 为段落字典（每次重新解析，先清空）"""
+        self.sections.clear()
         current_section = None
 
         for line in content.splitlines():
@@ -64,10 +65,10 @@ class AllenMemory:
                     self.sections[current_section] = []
                 continue
 
-            # 匹配列表项 "- xxx"
+            # 匹配列表项 "- xxx"（自动去重）
             if current_section and line.strip().startswith("- "):
                 item = line.strip()[2:].strip()
-                if item:
+                if item and item not in self.sections.get(current_section, []):
                     self.sections[current_section].append(item)
 
         # 确保默认段落存在
@@ -88,15 +89,17 @@ class AllenMemory:
         for section in ordered:
             items = self.sections.get(section, [])
             lines.append(f"## {section}")
-            if items:
-                for item in items:
+            seen = set()
+            for item in items:
+                if item not in seen:
+                    seen.add(item)
                     lines.append(f"- {item}")
             lines.append("")
 
         self.filepath.write_text("\n".join(lines), encoding="utf-8")
 
     def get_context(self) -> str:
-        """返回要注入 system prompt 的内容"""
+        """返回要注入 system prompt 的内容（自动去重）"""
         if not self.sections or all(not v for v in self.sections.values()):
             return ""
 
@@ -104,7 +107,13 @@ class AllenMemory:
         for section in self.DEFAULT_SECTIONS:
             items = self.sections.get(section, [])
             if items:
-                items_text = "\n".join(f"  - {item}" for item in items)
+                seen = set()
+                unique = []
+                for item in items:
+                    if item not in seen:
+                        seen.add(item)
+                        unique.append(item)
+                items_text = "\n".join(f"  - {item}" for item in unique)
                 parts.append(f"【{section}】\n{items_text}")
 
         # 追加非默认段落

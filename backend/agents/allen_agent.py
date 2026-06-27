@@ -52,6 +52,7 @@ class AllenAgent(BaseAgent):
         self._cancel_event = threading.Event()  # ESC 取消信号
         self._current_conversation_id: str | None = None  # 当前对话 ID（用于追加 summary）
         self.compressor = ConversationCompressor(llm_provider)
+        self.reasoning_effort: str | None = None
 
     def reset_auto_confirm(self):
         """重置自动确认状态（新对话时调用）"""

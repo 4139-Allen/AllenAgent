@@ -40,3 +40,23 @@ async def delete_conversation(conv_id: str, state: AppState = Depends(get_app_st
     if conversation_service.delete_conversation(state.store, conv_id):
         return {"status": "deleted", "id": conv_id}
     raise HTTPException(404, f"对话 {conv_id} 不存在")
+
+
+@router.post("/{conv_id}/pin")
+async def pin_conversation(conv_id: str, state: AppState = Depends(get_app_state)):
+    """置顶/取消置顶对话"""
+    try:
+        result = conversation_service.toggle_pin(state.store, conv_id)
+        return result
+    except FileNotFoundError:
+        raise HTTPException(404, f"对话 {conv_id} 不存在")
+
+
+@router.post("/{conv_id}/compress")
+async def compress_conversation(conv_id: str, state: AppState = Depends(get_app_state)):
+    """压缩对话（LLM 摘要）"""
+    try:
+        result = conversation_service.compress_conversation(state, conv_id)
+        return result
+    except FileNotFoundError:
+        raise HTTPException(404, f"对话 {conv_id} 不存在")
