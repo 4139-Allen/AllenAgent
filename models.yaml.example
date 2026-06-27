@@ -1,0 +1,123 @@
+# 模型提供商配置
+# 复制此文件为 models.yaml 并填入你的 API Key
+# ⚠️ models.yaml 包含敏感信息，请勿提交到 Git
+
+providers:
+  deepseek:
+    name: "DeepSeek"
+    base_url: "https://api.deepseek.com"
+    api_key: ""  # 填入你的 API Key
+    protocol: "openai"
+    models:
+      deepseek-v4-flash:
+        name: "DeepSeek V4 Flash"
+        max_tokens: 393216
+        context_window: 1000000
+        has_vision: false
+      deepseek-v4-pro:
+        name: "DeepSeek V4 Pro"
+        max_tokens: 393216
+        context_window: 1000000
+        has_vision: false
+
+
+  openai:
+    name: "OpenAI"
+    base_url: "https://api.openai.com/v1"
+    api_key: ""  # 填入你的 API Key
+    protocol: "openai"
+    models:
+      gpt-4o:
+        name: "GPT-4o"
+        max_tokens: 4096
+        context_window: 128000
+        has_vision: true
+      gpt-4o-mini:
+        name: "GPT-4o Mini"
+        max_tokens: 4096
+        context_window: 128000
+        has_vision: true
+
+  zhipu:
+    name: "智谱 AI"
+    base_url: "https://open.bigmodel.cn/api/paas/v4"
+    api_key: ""  # 填入你的 API Key
+    protocol: "openai"
+    models:
+      glm-5.2:
+        name: "GLM-5.2"
+        max_tokens: 65536
+        context_window: 1000000
+        has_vision: true
+      glm-4-flash:
+        name: "GLM-4 Flash"
+        max_tokens: 4096
+        context_window: 128000
+        has_vision: false
+
+  anthropic:
+    name: "Anthropic"
+    base_url: "https://api.anthropic.com"
+    api_key: ""  # 填入你的 API Key
+    protocol: "anthropic"
+    models:
+      claude-sonnet-4-6:
+        name: "Claude Sonnet 4.6"
+        max_tokens: 8192
+        context_window: 200000
+        has_vision: true
+      claude-haiku-4-5:
+        name: "Claude Haiku 4.5"
+        max_tokens: 8192
+        context_window: 200000
+        has_vision: true
+
+  moonshot:
+    name: "月之暗面"
+    base_url: "https://api.moonshot.cn/v1"
+    api_key: ""  # 填入你的 API Key
+    protocol: "openai"
+    models:
+      moonshot-v1-8k:
+        name: "Moonshot V1 8K"
+        max_tokens: 4096
+        context_window: 8192
+        has_vision: false
+      moonshot-v1-32k:
+        name: "Moonshot V1 32K"
+        max_tokens: 4096
+        context_window: 32768
+        has_vision: false
+
+  baidu:
+    name: "百度文心"
+    base_url: "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop"
+    api_key: ""  # 填入你的 API Key
+    protocol: "openai"
+    models:
+      ernie-4.0-8k:
+        name: "ERNIE 4.0"
+        max_tokens: 4096
+        context_window: 8192
+        has_vision: false
+
+  qwen:
+    name: "通义千问"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    api_key: ""  # 填入你的 API Key
+    protocol: "openai"
+    models:
+      qwen-max:
+        name: "Qwen Max"
+        max_tokens: 4096
+        context_window: 32768
+        has_vision: false
+      qwen-turbo:
+        name: "Qwen Turbo"
+        max_tokens: 4096
+        context_window: 32768
+        has_vision: false
+
+# 默认配置
+default_provider: "deepseek"
+default_model: "deepseek-v4-flash"
