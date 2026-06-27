@@ -1,14 +1,12 @@
 """终端 REPL — 纯文本交互模式"""
 
 from memory.conversation_store import ConversationStore
-from perception.router import PerceptionRouter
 from frontends.shared.commands import get_cli_commands, get_help_text, find_command
 
 def run_cli(agent, model_manager, allen_memory=None):
     """终端对话模式"""
     memory = agent.memory
     store = ConversationStore()
-    perception = PerceptionRouter(max_chars=12000)
     current_id = None
 
     # 尝试加载上次对话
@@ -60,17 +58,8 @@ def run_cli(agent, model_manager, allen_memory=None):
             print(result)
             continue
 
-        # ── 感知层处理 ───────────────────────
-        ctx = perception.process(user_input)
-
-        if ctx.truncated:
-            print(f"  输入过长（{ctx.original_size} 字符），已截断至 {ctx.size} 字符")
-
-        if ctx.source_type == "file":
-            print(f"  已读取文件: {ctx.metadata.get('source_file', '')}")
-
         # ── 普通对话 ─────────────────────────
-        result = agent.run(ctx.text, verbose=True)
+        result = agent.run(user_input, verbose=True)
         answer = result["answer"].strip()
         print(f"\n助手: {answer}")
 
