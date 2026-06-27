@@ -90,7 +90,12 @@ class ChatPanel(ScrollableContainer):
     def finish_thought_block(self, elapsed: int | None = None):
         """结束推理过程块并设置最终耗时"""
         if self._current_thought:
-            self._current_thought.finish(elapsed)
+            # 空推理块（只有计时没有内容）直接移除，不留空壳
+            if not self._current_thought._segments:
+                self._current_thought.remove()
+            else:
+                self._current_thought.finish(elapsed)
+                self._last_thought = self._current_thought
             self._current_thought = None
         elif self._last_thought and elapsed is not None:
             # 已被 _finalize_thought 提前结束的，更新耗时
