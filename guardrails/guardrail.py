@@ -6,7 +6,6 @@
 import logging
 from dataclasses import dataclass
 
-from guardrails.input_filter import InputFilter, InputCheckResult
 from guardrails.output_filter import OutputFilter, OutputCheckResult
 from guardrails.tool_policy import ToolPolicy, ToolPolicyResult
 
@@ -52,10 +51,6 @@ class Guardrail:
         enable_llm_check: bool = False,
         require_confirm_for_write: bool = False,
     ):
-        self.input_filter = InputFilter(
-            enable_llm_check=enable_llm_check,
-            llm_provider=llm_provider,
-        )
         self.output_filter = OutputFilter()
         self.tool_policy = ToolPolicy(require_confirm_for_write=require_confirm_for_write)
 
@@ -64,19 +59,13 @@ class Guardrail:
         self.output_filter.set_system_prompt(prompt)
 
     def check_input(self, text: str) -> GuardrailResult:
-        """检查用户输入"""
-        result = self.input_filter.check(text)
-
-        # 记录日志
-        if result.risk_level != "safe":
-            logger.warning(f"[Guardrail] 输入风险: {result.risk_level} - {result.reason}")
-
+        """检查用户输入（已禁用规则检测，仅透传）"""
         return GuardrailResult(
-            passed=result.passed,
+            passed=True,
             stage="input",
-            risk_level=result.risk_level,
-            reason=result.reason,
-            sanitized_text=result.sanitized,
+            risk_level="safe",
+            reason="",
+            sanitized_text=text,
         )
 
     def check_tool(self, tool_name: str, kwargs: dict) -> GuardrailResult:
