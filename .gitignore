@@ -24,6 +24,12 @@ models.yaml
 # 对话记录（含隐私）
 conversations/
 
+# Agent 持久记忆（可能含隐私）
+Allen.md
+
+# 缓存
+.pytest_cache/
+
 # 向量数据库
 Vector_library/
 
