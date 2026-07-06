@@ -24,6 +24,9 @@ models.yaml
 # 对话记录（含隐私）
 backend/conversations/
 
+# 用户上传文件
+backend/uploads/
+
 # Agent 持久记忆（可能含隐私）
 backend/Allen.md
 

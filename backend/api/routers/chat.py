@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from sse_starlette.sse import EventSourceResponse
 
 from api.schemas.chat import ChatRequest
-from api.dependencies import AppState, get_app_state
+from api.dependencies import AppState, get_app_state, get_current_user
 from schemas.stream import StreamEvent
 from services.agent_service import run_agent_session
 
@@ -63,9 +63,19 @@ async def _to_async(sync_gen):
 
 
 @router.post("/chat/stream")
-async def chat_stream(body: ChatRequest, state: AppState = Depends(get_app_state)):
+async def chat_stream(
+    body: ChatRequest,
+    state: AppState = Depends(get_app_state),
+    current_user: dict | None = Depends(get_current_user),
+):
     """发送消息并返回 SSE 流式响应"""
-    stream_gen, saved_id = run_agent_session(state, body.message, body.conversation_id, reasoning_effort=body.reasoning_effort)
+    user_id = current_user["id"] if current_user else None
+    stream_gen, saved_id = run_agent_session(
+        state, body.message, body.conversation_id,
+        reasoning_effort=body.reasoning_effort,
+        files=[f.model_dump() for f in body.files] if body.files else None,
+        user_id=user_id,
+    )
 
     async def _generate():
         yield {

@@ -7,7 +7,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from api.dependencies import AppState, get_app_state
+from api.dependencies import AppState, get_app_state, get_current_user
 from services import conversation_service
 
 logger = logging.getLogger(__name__)
@@ -18,13 +18,19 @@ router = APIRouter(prefix="/conversations", tags=["conversations"])
 async def list_conversations(
     page: int = 1, page_size: int = 20,
     state: AppState = Depends(get_app_state),
+    current_user: dict | None = Depends(get_current_user),
 ):
-    return conversation_service.list_conversations(state.store, page, page_size)
+    user_id = current_user["id"] if current_user else None
+    return conversation_service.list_conversations(state.store, page, page_size, user_id=user_id)
 
 
 @router.post("")
-async def create_conversation(state: AppState = Depends(get_app_state)):
-    return conversation_service.create_conversation(state.store, state.config.max_turns)
+async def create_conversation(
+    state: AppState = Depends(get_app_state),
+    current_user: dict | None = Depends(get_current_user),
+):
+    user_id = current_user["id"] if current_user else None
+    return conversation_service.create_conversation(state.store, state.config.max_turns, user_id=user_id)
 
 
 @router.get("/{conv_id}")

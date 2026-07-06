@@ -1,4 +1,11 @@
 import type { StreamEvent } from '../types'
+import { getToken } from './api'
+
+export interface FileAttachment {
+  name: string
+  path: string
+  type: string
+}
 
 /**
  * Connect to the SSE chat stream.
@@ -11,13 +18,25 @@ export function chatStream(
   onError: (error: string) => void,
   onDone: (conversationId: string) => void,
   reasoningEffort?: string,
+  files?: FileAttachment[],
 ): AbortController {
   const controller = new AbortController()
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = getToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   fetch('/api/chat/stream', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, conversation_id: conversationId, reasoning_effort: reasoningEffort || undefined }),
+    headers,
+    body: JSON.stringify({
+      message,
+      conversation_id: conversationId,
+      reasoning_effort: reasoningEffort || undefined,
+      files: files?.length ? files : undefined,
+    }),
     signal: controller.signal,
   })
     .then(async (response) => {
@@ -47,11 +66,9 @@ export function chatStream(
             const lines = buffer.split('\n')
             buffer = lines.pop() || ''
 
-            let currentEvent = ''
-
             for (const line of lines) {
               if (line.startsWith('event: ')) {
-                currentEvent = line.slice(7).trim()
+                // event type line - not currently used
               } else if (line.startsWith('data: ')) {
                 const data = line.slice(6)
                 try {

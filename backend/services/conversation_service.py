@@ -4,13 +4,10 @@
 对话的 CRUD 操作。
 """
 
-from memory.short_term import ConversationMemory
-from memory.conversation_store import ConversationStore
 
-
-def list_conversations(store: ConversationStore, page: int = 1, page_size: int = 20):
+def list_conversations(store, page: int = 1, page_size: int = 20, user_id: str | None = None):
     """分页获取对话列表"""
-    all_ = store.list_all()
+    all_ = store.list_all(user_id=user_id)
     total = len(all_)
     start = (page - 1) * page_size
     items = all_[start:start + page_size] if start < total else []
@@ -30,14 +27,15 @@ def list_conversations(store: ConversationStore, page: int = 1, page_size: int =
     }
 
 
-def create_conversation(store: ConversationStore, max_turns: int):
+def create_conversation(store, max_turns: int, user_id: str | None = None):
     """新建空对话"""
+    from memory.short_term import ConversationMemory
     memory = ConversationMemory(max_turns=max_turns)
-    conv_id = store.save(memory)
+    conv_id = store.save(memory, user_id=user_id)
     return {"id": conv_id, "title": "", "turn_count": 0}
 
 
-def get_conversation(store: ConversationStore, conv_id: str):
+def get_conversation(store, conv_id: str):
     """获取对话详情"""
     loaded = store.load(conv_id)
     return {
@@ -47,12 +45,12 @@ def get_conversation(store: ConversationStore, conv_id: str):
     }
 
 
-def delete_conversation(store: ConversationStore, conv_id: str) -> bool:
+def delete_conversation(store, conv_id: str) -> bool:
     """删除对话"""
     return store.delete(conv_id)
 
 
-def toggle_pin(store: ConversationStore, conv_id: str) -> dict:
+def toggle_pin(store, conv_id: str) -> dict:
     """切换置顶状态"""
     pinned = store.toggle_pin(conv_id)
     return {"status": "ok", "id": conv_id, "pinned": pinned}

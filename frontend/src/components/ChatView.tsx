@@ -3,11 +3,14 @@ import type { DisplayMessage } from '../hooks/useChat'
 import type { ModelInfo } from '../types'
 import ChatInput from './ChatInput'
 import logoSrc from '../assets/logo/logo.jpg'
+import type { UploadedFile } from '../services/api'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface ChatViewProps {
   messages: DisplayMessage[]
   streaming: boolean
-  onSend: (text: string) => void
+  onSend: (text: string, files?: UploadedFile[]) => void
   onStop: () => void
   currentModel?: string
   models?: ModelInfo[]
@@ -45,21 +48,74 @@ function ThinkingBlock({ text }: { text: string }) {
   )
 }
 
+/** Markdown 渲染组件 — 统一的样式配置 */
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <Markdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        // 标题
+        h1: ({ children }) => <h1 className="text-xl font-bold mt-5 mb-2 text-gray-900">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-lg font-bold mt-4 mb-2 text-gray-900">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-base font-semibold mt-3 mb-1 text-gray-900">{children}</h3>,
+        // 段落
+        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+        // 列表
+        ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+        li: ({ children }) => <li className="text-sm leading-relaxed">{children}</li>,
+        // 代码
+        code: ({ className, children, ...props }) => {
+          const isInline = !className
+          return isInline ? (
+            <code className="px-1 py-0.5 bg-gray-100 rounded text-sm font-mono text-pink-600" {...props}>
+              {children}
+            </code>
+          ) : (
+            <code className="block bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-mono whitespace-pre-wrap my-2" {...props}>
+              {children}
+            </code>
+          )
+        },
+        // 引用
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-2 border-gray-300 pl-3 my-2 text-gray-500 italic">{children}</blockquote>
+        ),
+        // 分割线
+        hr: () => <hr className="my-4 border-gray-200" />,
+        // 表格（GFM）
+        table: ({ children }) => (
+          <div className="overflow-x-auto my-3">
+            <table className="min-w-full text-sm border-collapse border border-gray-200">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
+        th: ({ children }) => <th className="border border-gray-200 px-3 py-2 text-left font-semibold text-gray-700">{children}</th>,
+        td: ({ children }) => <td className="border border-gray-200 px-3 py-2 text-gray-700">{children}</td>,
+        // 链接
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+            {children}
+          </a>
+        ),
+        // 加粗
+        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+      }}
+    >
+      {content}
+    </Markdown>
+  )
+}
+
 function MessageBubble({ msg }: { msg: DisplayMessage }) {
   const isUser = msg.role === 'user'
 
-  const renderContent = (content: string) => {
-    const parts = content.split(/(\*\*[^*]+\*\*)/g)
-    return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
-      }
-      return part
-    })
-  }
-
   const body = msg.content ? (
-    renderContent(msg.content)
+    isUser ? (
+      <span className="whitespace-pre-wrap">{msg.content}</span>
+    ) : (
+      <MarkdownContent content={msg.content} />
+    )
   ) : msg.isStreaming ? (
     <span className="inline-flex gap-1">
       <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -74,7 +130,7 @@ function MessageBubble({ msg }: { msg: DisplayMessage }) {
     return (
       <div className="flex justify-end mb-6">
         <div className="max-w-[80%]">
-          <div className="rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-gray-100 text-gray-800">
+          <div className="rounded-2xl px-4 py-2.5 text-sm leading-relaxed bg-gray-100 text-gray-800">
             {body}
           </div>
         </div>
@@ -86,7 +142,7 @@ function MessageBubble({ msg }: { msg: DisplayMessage }) {
   return (
     <div className="mb-6">
       {msg.thinking && <ThinkingBlock text={msg.thinking} />}
-      <div className={`text-sm leading-relaxed whitespace-pre-wrap text-gray-800 px-1 ${msg.isStreaming ? 'animate-pulse-subtle' : ''}`}>
+      <div className={`text-sm leading-relaxed text-gray-800 px-1 ${msg.isStreaming ? 'animate-pulse-subtle' : ''}`}>
         {body}
       </div>
     </div>
@@ -109,6 +165,8 @@ export default function ChatView({
   const scrollRef = useRef<HTMLDivElement>(null)
   const [userAway, setUserAway] = useState(false)
   const awayRef = useRef(false)
+  const prevMsgLenRef = useRef(messages.length)
+  const prevStreamingRef = useRef(streaming)
 
   // Track if user scrolled away from bottom (throttled via ref)
   const handleScroll = () => {
@@ -122,12 +180,17 @@ export default function ChatView({
     }
   }
 
-  // Auto-scroll only if user wasn't away
+  // Auto-scroll: only on new message or streaming end (not on every token)
   useEffect(() => {
-    if (!userAway && bottomRef.current) {
+    const hasNewMessage = messages.length > prevMsgLenRef.current
+    const streamingJustEnded = prevStreamingRef.current && !streaming
+    prevMsgLenRef.current = messages.length
+    prevStreamingRef.current = streaming
+
+    if (!userAway && bottomRef.current && (hasNewMessage || streamingJustEnded)) {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages])
+  }, [messages, streaming])
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-white relative">

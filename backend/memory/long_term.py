@@ -11,10 +11,10 @@ from datetime import datetime
 
 class AllenMemory:
     """
-    Allen.md 持久记忆管理
+    Allen.md 持久记忆管理（按用户隔离）
 
     文件结构：
-        # Allen.md
+        # Allen.md — Agent 持久记忆
         ## 用户偏好
         - xxx
         ## 项目约定
@@ -23,6 +23,9 @@ class AllenMemory:
         - 2026-06-16: xxx
         ## 待办
         - [ ] xxx
+
+    每个用户有独立的文件： Allen_{user_id}.md
+    未登录用户（user_id=None）使用 Allen.md
     """
 
     # 默认段落（按顺序）
@@ -33,9 +36,10 @@ class AllenMemory:
         "待办",
     ]
 
-    def __init__(self, filepath: str = None):
+    def __init__(self, filepath: str = None, user_id: str = None):
         if filepath is None:
-            filepath = str(Path(__file__).parent.parent / "Allen.md")
+            filename = f"Allen_{user_id}.md" if user_id else "Allen.md"
+            filepath = str(Path(__file__).parent.parent / filename)
         self.filepath = Path(filepath)
         self.sections: dict[str, list[str]] = {}
         self._load()

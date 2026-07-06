@@ -3,11 +3,12 @@
 所有配置从 models.yaml 读取，一处管理
 """
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# 项目根目录（web_allen_agent/）
-PROJECT_ROOT = Path(__file__).parent.parent
+# 项目根目录（web_allen_agent/），Docker 部署时通过环境变量覆盖
+PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT", Path(__file__).parent.parent))
 
 
 @dataclass

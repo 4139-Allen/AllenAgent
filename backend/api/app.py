@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import ApiConfig
 from api.dependencies import AppState
-from api.routers import chat, conversations, models, memory, health, profile
+from api.routers import chat, conversations, models, memory, health, profile, upload, auth
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,34 @@ def create_app() -> FastAPI:
     app.include_router(memory.router, prefix="/api")
     app.include_router(health.router)
     app.include_router(profile.router)
+    app.include_router(upload.router, prefix="/api")
+    app.include_router(auth.router, prefix="/api")
+
+    # 启动时创建/更新数据库表
+    from db.database import init_db, engine
+    init_db()
+    # 数据库迁移：新加列 / 删旧列
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            # 加 avatar_data / avatar_mime（已有表不会自动加）
+            for col, col_type in (("avatar_data", "BLOB"), ("avatar_mime", "VARCHAR(20)")):
+                try:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_type}"))
+                except Exception:
+                    pass  # 列已存在
+
+            # 删 avatar_url（已废弃，改用 avatar_data）
+            try:
+                conn.execute(text("ALTER TABLE users DROP COLUMN avatar_url"))
+                logger.info("[DB] users 表已清理: 删除 avatar_url 列")
+            except Exception:
+                pass  # 列已不存在或 SQLite 不支持
+
+            conn.commit()
+    except Exception:
+        pass  # 兼容无 users 表的情况
+
     return app
 
 

@@ -735,6 +735,13 @@ def run_stream(agent: AllenAgent, query: str) -> Generator[StreamEvent, None, No
                 step=step,
             )
 
+            # 将子任务描述注入 memory（替换原始完整问题，让 LLM 聚焦当前子任务）
+            if agent.memory:
+                agent.memory.add_message(
+                    "user",
+                    f"[子任务 {step}/{len(subtasks)}] {task}"
+                )
+
             assistant_started = False
             subtask_answer = ""
             for event in execute_task_stream(agent, task, max_steps=25):
@@ -753,11 +760,11 @@ def run_stream(agent: AllenAgent, query: str) -> Generator[StreamEvent, None, No
             subtask_results.append(subtask_answer.strip())
             yield StreamEvent(type="subtask_done", step=step, total=len(subtasks))
 
-            # 🔗 上下文桥接：告知上一个子任务结果，仅提供参考不限制后续工具使用
+            # 🔗 上下文桥接：告知上一个子任务已完成，为下一个子任务做准备
             if step < len(subtasks) and agent.memory:
                 agent.memory.add_message(
                     "user",
-                    "[系统] 上一个子任务已完成。继续当前任务，按需使用工具。"
+                    "[系统] 上一个子任务已完成。继续执行剩余的规划。"
                 )
 
         final_answer = agent._merge(subtask_results, query)

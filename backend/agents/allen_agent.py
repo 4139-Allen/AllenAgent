@@ -186,7 +186,13 @@ class AllenAgent(BaseAgent):
         else:
             # 复杂任务 → 执行子任务后合并
             subtask_results = []
-            for task in subtasks:
+            for i, task in enumerate(subtasks, 1):
+                # 将子任务描述注入 memory
+                if self.memory:
+                    self.memory.add_message(
+                        "user",
+                        f"[子任务 {i}/{len(subtasks)}] {task}"
+                    )
                 for event in self._execute_task_stream(task, max_steps=25):
                     if event.type in ("done", "cancelled", "error"):
                         break
@@ -196,6 +202,12 @@ class AllenAgent(BaseAgent):
                         if msg["role"] == "assistant" and msg.get("content") and not msg.get("_is_summary"):
                             subtask_results.append(msg["content"])
                             break
+                # 上下文桥接
+                if i < len(subtasks) and self.memory:
+                    self.memory.add_message(
+                        "user",
+                        "[系统] 上一个子任务已完成。继续执行剩余的规划。"
+                    )
 
             final_answer = self._merge(subtask_results, query)
 
@@ -234,22 +246,28 @@ class AllenAgent(BaseAgent):
     def _plan(self, query: str) -> dict:
         """将用户需求拆分为子任务列表
 
+        判断逻辑：完成这个需求是否必须依次调用多次不同类型的工具？
+        - 单步（一个搜索/一个文件操作/简单问答）→ 不拆分，直接 ReAct
+        - 多步（先后搜索不同内容 → 整理 → 写入文件）→ 拆分子任务依次执行
+
         Returns:
             {"subtasks": [str, ...], "reasoning": str}
         """
         plan_prompt = (
-            "你是任务规划师。将用户需求拆分为可独立执行的子任务。\n"
+            "你是一个任务规划师。判断用户需求是否需要拆分为多个子任务。\n\n"
             "规则：\n"
-            "- 每个子任务一行，不要序号，不要多余文字\n"
-            "- **如果需求简单不需要拆分，只输出一行用户原问题**\n"
-            "- **不要拆分只有一句话、一个问题的需求**，直接输出原问题\n"
-            "- 只有用户明确列出多个不同操作（如「搜索X」「查看Y」「汇总」）时才拆分\n"
-            "- 一个子任务不得超过 20 字\n"
+            "- 如果需求需要**依次调用多次工具**才能完成，按步骤拆分成子任务\n"
+            "- 每个子任务一行，不要序号，一句话描述清楚（20-50字）\n"
+            "- 如果一步就能完成（单个搜索/单个文件操作/简单问答），**只输出一行用户原问题**\n"
+            "\n"
+            "判断标准：完成这个需求是否必须依次调用多次不同类型的工具？\n"
+            "是 → 拆分。否 → 输出原问题。\n"
+            "\n"
             f"用户需求：{query}"
         )
         result = self.llm_provider.chat(
             messages=[
-                {"role": "system", "content": "你是一个精准的任务规划师。只输出子任务列表。没有多个独立操作时不要拆分，直接输出用户原问题。"},
+                {"role": "system", "content": "你是任务规划师。分析需求是否需要多步工具调用。需要多步则按行列出子任务，不需要则只输出原问题。"},
                 {"role": "user", "content": plan_prompt},
             ],
             tools=None,
@@ -259,16 +277,14 @@ class AllenAgent(BaseAgent):
             return {"subtasks": [query]}
 
         text = result["content"].strip()
-        lines = [line.strip().lstrip("0123456789.- ") for line in text.split("\n") if line.strip()]
-        subtasks = [line for line in lines if len(line) > 3]
+        lines = [line.strip().lstrip("0123456789.-• ") for line in text.split("\n") if line.strip()]
+        subtasks = [line for line in lines if len(line) > 4]
 
         if not subtasks:
             subtasks = [query]
 
-        # 启发式：如果原问题只有一句话（没有明确分隔符）但被拆分了，回退
-        MULTI_TASK_SEPS = ("\n", "1.", "2.", "①", "②", "首先", "然后", "和", "并", "同时")
-        has_multi_task_signal = any(s in query for s in MULTI_TASK_SEPS)
-        if len(subtasks) > 1 and not has_multi_task_signal:
+        # 去重：如果 LLM 输出的内容和原问题一样（不分大小写和标点），说明认为不需要拆分
+        if subtasks[0].strip().rstrip("。.!！？?") == query.strip().rstrip("。.!！？?"):
             subtasks = [query]
 
         return {"subtasks": subtasks[:10]}  # 最多 10 个子任务

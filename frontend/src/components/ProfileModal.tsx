@@ -119,7 +119,7 @@ export default function ProfileModal({ open, onClose, onNameChange, onAvatarChan
   const [tab, setTab] = useState<'profile' | 'memory'>('profile')
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [name, setName] = useState('')
-  const [memory, setMemory] = useState('')
+  const [_memory, setMemory] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [sectionItems, setSectionItems] = useState<Record<string, string[]>>({})
@@ -133,7 +133,10 @@ export default function ProfileModal({ open, onClose, onNameChange, onAvatarChan
     if (!open) return
     setTab('profile')
     setSaved(false)
-    fetch('/api/profile')
+    const token = localStorage.getItem('allen_token')
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    fetch('/api/profile', { headers })
       .then((r) => r.json())
       .then((data) => {
         setProfile(data)
@@ -155,11 +158,20 @@ export default function ProfileModal({ open, onClose, onNameChange, onAvatarChan
 
   const saveName = async () => {
     try {
-      await fetch('/api/profile/name', {
+      const token = localStorage.getItem('allen_token')
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch('/api/profile/name', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ name }),
       })
+      if (res.status === 401) {
+        localStorage.removeItem('allen_token')
+        localStorage.removeItem('allen_user')
+        window.location.reload()
+        return
+      }
       onNameChange?.(name)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -189,9 +201,12 @@ export default function ProfileModal({ open, onClose, onNameChange, onAvatarChan
     setSaving(true)
     try {
       const content = buildMemoryContent()
+      const token = localStorage.getItem('allen_token')
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
       await fetch('/api/profile/memory', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ content }),
       })
       setSaved(true)
@@ -214,9 +229,18 @@ export default function ProfileModal({ open, onClose, onNameChange, onAvatarChan
     const form = new FormData()
     form.append('file', file)
     try {
-      const res = await fetch('/api/profile/avatar', { method: 'POST', body: form })
+      const token = localStorage.getItem('allen_token')
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch('/api/profile/avatar', { method: 'POST', headers, body: form })
+      if (res.status === 401) {
+        localStorage.removeItem('allen_token')
+        localStorage.removeItem('allen_user')
+        window.location.reload()
+        return
+      }
       if (res.ok) {
-        setProfile((p) => p ? { ...p, avatar: '/api/profile/avatar?t=' + Date.now() } : p)
+        setProfile((p) => p ? { ...p, avatar: '/api/profile/avatar' } : p)
         onAvatarChange?.()
       }
     } catch (e) {
@@ -271,7 +295,7 @@ export default function ProfileModal({ open, onClose, onNameChange, onAvatarChan
                   title="点击更换头像"
                 >
                   {profile?.avatar ? (
-                    <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
+                    <img src={profile.avatar + '?token=' + (localStorage.getItem('allen_token') || '')} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-lg font-medium text-gray-400">
                       {(name || 'A')[0].toUpperCase()}
@@ -287,7 +311,7 @@ export default function ProfileModal({ open, onClose, onNameChange, onAvatarChan
                 <div>
                   <p className="text-xs text-gray-400">点击头像更换，支持 JPG / PNG，不超过 1MB</p>
                   {profile?.avatar && (
-                    <a href={profile.avatar} target="_blank" className="text-xs text-emerald-600 hover:text-emerald-700 mt-1 inline-block">
+                    <a href={profile.avatar + '?token=' + (localStorage.getItem('allen_token') || '')} target="_blank" className="text-xs text-emerald-600 hover:text-emerald-700 mt-1 inline-block">
                       查看大图
                     </a>
                   )}
@@ -335,7 +359,10 @@ export default function ProfileModal({ open, onClose, onNameChange, onAvatarChan
                   <button
                     onClick={async () => {
                       if (confirm('确定清空所有持久记忆？')) {
-                        await fetch('/api/profile/memory', { method: 'DELETE' })
+                        const token = localStorage.getItem('allen_token')
+                        const headers: Record<string, string> = {}
+                        if (token) headers['Authorization'] = `Bearer ${token}`
+                        await fetch('/api/profile/memory', { method: 'DELETE', headers })
                         const empty: Record<string, string[]> = {}
                         const ni: Record<string, string> = {}
                         for (const n of sectionNames) { empty[n] = []; ni[n] = '' }

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import type { StreamEvent } from '../types'
-import { chatStream } from '../services/chat'
+import { chatStream, type FileAttachment } from '../services/chat'
 
 export interface DisplayMessage {
   id: string
@@ -68,12 +68,19 @@ export function useChat() {
   }, [])
 
   const sendMessage = useCallback(
-    (text: string, conversationId: string | null, reasoningEffort?: string): Promise<string | null> => {
+    (text: string, conversationId: string | null, reasoningEffort?: string, files?: FileAttachment[]): Promise<string | null> => {
       return new Promise((resolve) => {
+        // 如果有文件，在用户消息中标注
+        let displayText = text
+        if (files?.length) {
+          const fileNames = files.map((f) => f.name).join(', ')
+          displayText = text || `发送了文件: ${fileNames}`
+        }
+
         const userMsg: DisplayMessage = {
           id: nextId(),
           role: 'user',
-          content: text,
+          content: displayText,
           timestamp: Date.now(),
         }
 
@@ -144,6 +151,7 @@ export function useChat() {
             resolve(finalConvId)
           },
           reasoningEffort,
+          files,
         )
 
         abortRef.current = controller
@@ -171,7 +179,7 @@ export function useChat() {
         .filter(
           (m) =>
             (m.role === 'user' || m.role === 'assistant') &&
-            (m.role !== 'assistant' || m.content), // 跳过纯 tool_call 的 assistant 消息
+            (m.role !== 'assistant' || m.content),
         )
         .map((m) => ({
           id: nextId(),

@@ -11,6 +11,7 @@ interface SidebarProps {
   onPin?: (id: string) => void
   onCompress?: (id: string) => void
   onSettings?: () => void
+  onLogout?: () => void
   userName?: string
   avatarUrl?: string | null
   collapsed: boolean
@@ -26,6 +27,7 @@ export default function Sidebar({
   onPin,
   onCompress,
   onSettings,
+  onLogout,
   userName,
   avatarUrl,
   collapsed,
@@ -164,7 +166,7 @@ export default function Sidebar({
           >
             <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
               {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                <img src={avatarUrl + '?token=' + (localStorage.getItem('allen_token') || '')} alt="" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-xs font-medium text-emerald-600">{(userName || 'A')[0].toUpperCase()}</span>
               )}
@@ -193,7 +195,14 @@ export default function Sidebar({
                   切换账号
                 </button>
                 <hr className="my-1 border-gray-100" />
-                <button className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onLogout?.()
+                    setMenuConvId(null)
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                >
                   退出登录
                 </button>
               </div>

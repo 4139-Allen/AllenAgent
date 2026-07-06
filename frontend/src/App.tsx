@@ -2,39 +2,52 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Sidebar from './components/Sidebar'
 import ChatView from './components/ChatView'
 import ProfileModal from './components/ProfileModal'
+import LoginPage from './components/LoginPage'
 import { useConversations } from './hooks/useConversations'
 import { useChat } from './hooks/useChat'
-import { conversationsApi, modelsApi } from './services/api'
+import { useAuth } from './hooks/useAuth'
+import { conversationsApi, modelsApi, setOnUnauthorized, getLastAuthError } from './services/api'
 import type { ModelInfo } from './types'
+import type { UploadedFile } from './services/api'
 
 export default function App() {
+  const auth = useAuth()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [currentModel, setCurrentModel] = useState('')
   const [models, setModels] = useState<ModelInfo[]>([])
   const [profileOpen, setProfileOpen] = useState(false)
   const [reasoningEffort, setReasoningEffort] = useState('low')
-  const [userName, setUserName] = useState('ALLen')
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [initDone, setInitDone] = useState(false)
   const convs = useConversations()
   const chat = useChat()
   const loadingConvRef = useRef(false)
 
-  // Init: fetch models and profile
+  // Register 401 handler
   useEffect(() => {
+    setOnUnauthorized(() => auth.clearAuth())
+  }, [auth.clearAuth])
+
+  // Init: fetch models and profile (only when logged in)
+  useEffect(() => {
+    if (!auth.token) {
+      setInitDone(true)
+      return
+    }
+
     Promise.all([
       modelsApi.list(),
-      fetch('/api/profile').then((r) => r.json()).catch(() => null),
+      fetch('/api/profile', {
+        headers: { 'Authorization': `Bearer ${auth.token}` },
+      }).then((r) => r.json()).catch(() => null),
     ])
       .then(([modelsRes, profile]) => {
-        setModels(modelsRes.models)
-        setCurrentModel(modelsRes.current)
-        if (profile?.name) setUserName(profile.name)
-        if (profile?.avatar) setAvatarUrl(profile.avatar)
+        setModels(modelsRes.models || [])
+        setCurrentModel(modelsRes.current || '')
+        if (profile?.name) auth.user && (auth.user.name = profile.name)
       })
       .catch(() => {})
       .finally(() => setInitDone(true))
-  }, [])
+  }, [auth.token])
 
   // Load conversation history when switching
   useEffect(() => {
@@ -65,15 +78,14 @@ export default function App() {
   }, [])
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, files?: UploadedFile[]) => {
       let convId = convs.currentId
       if (!convId) {
-        // No conversation yet — create one before sending
         convId = await convs.create()
         if (!convId) return
       }
 
-      const finalId = await chat.sendMessage(text, convId, reasoningEffort)
+      const finalId = await chat.sendMessage(text, convId, reasoningEffort, files)
       if (finalId) {
         convs.updateAfterStream(finalId)
       }
@@ -121,7 +133,6 @@ export default function App() {
       try {
         const res = await conversationsApi.compress(id)
         if (res.status === 'ok') {
-          // 压缩后刷新列表和当前对话
           convs.fetchList()
           if (convs.currentId === id) {
             const data = await conversationsApi.get(id)
@@ -135,6 +146,19 @@ export default function App() {
     [convs, chat],
   )
 
+  // ── 未登录 → 显示登录页 ──
+  if (!auth.token) {
+    return (
+      <LoginPage
+        onLogin={auth.login}
+        onRegister={auth.register}
+        loading={auth.loading}
+        error={getLastAuthError()}
+      />
+    )
+  }
+
+  // ── 加载中 ──
   if (!initDone) {
     return (
       <div className="h-screen bg-white flex items-center justify-center">
@@ -146,26 +170,31 @@ export default function App() {
     )
   }
 
+  // ── 已登录 → 主界面 ──
   return (
     <div className="h-screen flex bg-white text-gray-900 overflow-hidden">
-      {/* Sidebar */}
       <Sidebar
         conversations={convs.list}
         currentId={convs.currentId}
-        userName={userName}
-        avatarUrl={avatarUrl}
+        userName={auth.user?.name || 'ALLen'}
+        avatarUrl={auth.user?.avatar_url || null}
         onNew={handleNewChat}
         onSelect={handleSelectConversation}
         onDelete={handleDeleteConversation}
         onPin={handlePin}
         onCompress={handleCompress}
         onSettings={() => setProfileOpen(true)}
+        onLogout={auth.logout}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed((v) => !v)}
       />
-      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} onNameChange={setUserName} onAvatarChange={() => setAvatarUrl('/api/profile/avatar?t=' + Date.now())} />
+      <ProfileModal
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onNameChange={(name) => { if (auth.user) auth.user.name = name }}
+        onAvatarChange={() => auth.refreshUser()}
+      />
 
-      {/* Sidebar reopen button (visible when collapsed) */}
       {sidebarCollapsed && (
         <button
           onClick={() => setSidebarCollapsed(false)}
